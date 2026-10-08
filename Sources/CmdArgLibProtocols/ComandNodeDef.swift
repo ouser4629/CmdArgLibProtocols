@@ -202,7 +202,7 @@ extension CommandNodeDef {
                     let (actualElementType, actualElementTypeName, actualTypewrapper) = elementTypeAndWrapper(of: childType)
                     if !(actualElementType is Bool.Type || actualElementType is Rest.Type) {
                         guard actualElementType is CmdArgBasicType.Type else {
-                            messages.append("\(childType) is not a valid stored property type to use with CommandSpec")
+                            messages.append("\(childType) is not a valid stored property type to use with CommandNodeDef")
                             continue
                         }
                     }
