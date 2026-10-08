@@ -19,7 +19,7 @@ import Foundation
 public protocol MainFunctionDef: Sendable, Codable {
     init()
     var attributes: MainFunctionAttributes? { get set }
-    func run(state: [Void]) async throws -> [Void]
+    func run() async throws
 }
 
 extension MainFunctionDef {
@@ -64,7 +64,7 @@ extension MainFunctionDef {
             let parseResult = try ParseResult(
                 callNames: nodePath.map { $0.name },
                 words: words,
-                parentCommandMode: !nodePath.last!.__children__.isEmpty,
+                parentCommandMode: false,
                 context: runContext)
             let trailingWords = parseResult.trailingWords
             var messages = parseResult.parsedErrors.map { $0.description }
@@ -159,8 +159,8 @@ extension MainFunctionDef {
             let data = encoded.data(using: .utf8)!
             var newInstance = try decoder.decode(Self.self, from: data)
             newInstance.attributes = self.attributes
-            let newState: [Void] = try await newInstance.run(state: state)
-            return (newState, trailingWords)
+            try await newInstance.run()
+            return ([], trailingWords)
         }
 
         @Sendable func runContextMaker() -> RunContext
