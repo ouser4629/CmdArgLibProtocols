@@ -179,12 +179,11 @@ extension MainFunctionDef {
                 if let parameterName = child.label {
                     storedPropertyNames.insert(parameterName)
                     var defaultValueIsNil = false
-                    var childType = type(of: child.value)
-                    let deadwood =  "\(childType)"
+                    let childType = type(of: child.value)
                     if let metaType = child.value as? MetaType{
                         metaTypePairs.append((parameterName, metaType))
                     }
-                    if let optional = childType as? OptionalType.Type {
+                    if childType is OptionalType.Type {
                         defaultValueIsNil = "\(child.value)" == "nil"
                     }
                     let actualTypeName = "\(childType)"
@@ -205,14 +204,8 @@ extension MainFunctionDef {
                     var typeIsMaybe = false
                     if let (maybeLabelSpec, maybeTypeName) = parameterCustomSpecs[parameterName] {
                         let customLabelSpec = maybeLabelSpec ?? labelSpec
-                        var customTypeName = maybeTypeName ?? actualTypeName
+                        let customTypeName = maybeTypeName ?? actualTypeName
                         typeIsMaybe = customTypeName.hasPrefix("Maybe<") && customTypeName.hasSuffix(">")
-//                        if customTypeName.hasSuffix("??") {
-//                            customTypeName = "Optional<\(customTypeName.dropLast(2))>"
-//                        }
-//                        else if customTypeName.hasSuffix("?") {
-//                            customTypeName = "\(customTypeName.dropLast(1))"
-//                        }
                         let (customElementTypeName, customTypeWrapper) = elementTypeNameAndWrapper(of: customTypeName)
                         var intendedTypeWrapper = customTypeWrapper
                         if customTypeWrapper == .variadic {
@@ -244,8 +237,7 @@ extension MainFunctionDef {
                         parameters.append(parameter)
                     }
                     else {
-                        let notRequired = typeWrapper == .optional && typeIsMaybe
-                        let parameter = Parameter(labelSpec, parameterName, typeName, nil, forceNotRequired: notRequired)
+                        let parameter = Parameter(labelSpec, parameterName, typeName, nil, forceNotRequired: typeIsMaybe)
                         parameters.append(parameter)
                     }
                 }
