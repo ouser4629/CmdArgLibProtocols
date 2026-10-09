@@ -179,11 +179,14 @@ extension MainFunctionDef {
                 if let parameterName = child.label {
                     storedPropertyNames.insert(parameterName)
                     var defaultValueIsNil = false
-                    let childType = type(of: child.value)
+                    var childType = type(of: child.value)
+//                    var childTypeWasOptional = false
                     if let metaType = child.value as? MetaType{
                         metaTypePairs.append((parameterName, metaType))
                     }
-                    if childType is OptionalType.Type {
+                    if let optional = childType as? OptionalType.Type {
+//                        childTypeWasOptional = true
+                        childType = optional.wrappedType
                         defaultValueIsNil = "\(child.value)" == "nil"
                     }
                     let actualTypeName = "\(childType)"

@@ -186,14 +186,14 @@ extension CommandNodeDef {
             for child in Mirror(reflecting: instance).children {
                 if let parameterName = child.label {
                     storedPropertyNames.insert(parameterName)
-                    var hasDefaultValue = true
+                    var defaultValueIsNil = false
                     var childType = type(of: child.value)
                     if let metaType = child.value as? MetaType{
                         metaTypePairs.append((parameterName, metaType))
                     }
                     if let optional = childType as? OptionalType.Type {
                         childType = optional.wrappedType
-                        hasDefaultValue = false
+                        defaultValueIsNil = "\(child.value)" == "nil"
                     }
                     let actualTypeName = "\(childType)"
                     if actualTypeName.hasPrefix("CommandNodeConfig<") {
@@ -210,15 +210,11 @@ extension CommandNodeDef {
                     var labelSpec = parameterName
                     var elementTypeName = actualElementTypeName
                     var typeWrapper = actualTypewrapper
+                    var typeIsMaybe = false
                     if let (maybeLabelSpec, maybeTypeName) = parameterCustomSpecs[parameterName] {
                         let customLabelSpec = maybeLabelSpec ?? labelSpec
-                        var customTypeName = maybeTypeName ?? actualTypeName
-                        if customTypeName.hasSuffix("??") {
-                            customTypeName = "Optional<\(customTypeName.dropLast(2))>"
-                        }
-                        else if customTypeName.hasSuffix("?") {
-                            customTypeName = "\(customTypeName.dropLast(1))"
-                        }
+                        let customTypeName = maybeTypeName ?? actualTypeName
+                        typeIsMaybe = customTypeName.hasPrefix("Maybe<") && customTypeName.hasSuffix(">")
                         let (customElementTypeName, customTypeWrapper) = elementTypeNameAndWrapper(of: customTypeName)
                         var intendedTypeWrapper = customTypeWrapper
                         if customTypeWrapper == .variadic {
@@ -245,12 +241,12 @@ extension CommandNodeDef {
                     case .none:
                         typeName = elementTypeName
                     }
-                    if let value = child.value as? CustomStringConvertible, hasDefaultValue {
+                    if let value = child.value as? CustomStringConvertible, !defaultValueIsNil {
                         let parameter = Parameter(labelSpec, parameterName, typeName, __quotedOrNil(value))
                         parameters.append(parameter)
                     }
                     else {
-                        let parameter = Parameter(labelSpec, parameterName, typeName, nil)
+                        let parameter = Parameter(labelSpec, parameterName, typeName, nil, forceNotRequired: typeIsMaybe)
                         parameters.append(parameter)
                     }
                 }
@@ -325,10 +321,19 @@ func elementTypeAndWrapper(of childType: Any.Type) -> (Any.Type, String, TypeWra
     return (elementType, elementTypeName, typeWrapper)
 }
 
-func elementTypeNameAndWrapper(of typeName: String) -> (String, TypeWrapper)
+func elementTypeNameAndWrapper(of rawTypeName: String) -> (String, TypeWrapper)
 {
     var elementTypeName = ""
     var typeWrapper: TypeWrapper = .none
+    var typeName = rawTypeName
+
+    if typeName.hasPrefix("Optional<") && typeName.hasSuffix(">"){
+        typeName = String(typeName.dropFirst(9).dropLast(1))
+    }
+    else if typeName.hasSuffix("?") {
+        typeName = String(typeName.dropLast(1))
+    }
+
 
     if typeName.hasPrefix("Optional<") && typeName.hasSuffix(">"){
         elementTypeName = String(typeName.dropFirst(9).dropLast(1))
@@ -351,8 +356,9 @@ func elementTypeNameAndWrapper(of typeName: String) -> (String, TypeWrapper)
         typeWrapper = .variadic
     }
     else if typeName.hasPrefix("Maybe<") && typeName.hasSuffix(">"){
-        elementTypeName = String(typeName.dropFirst(6).dropLast(1))
-        typeWrapper = .optional
+        let rawTypeName = String(typeName.dropFirst(6).dropLast(1))
+        return elementTypeNameAndWrapper(of: rawTypeName)
+
     }
     else {
         elementTypeName = typeName
