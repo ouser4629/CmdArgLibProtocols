@@ -312,7 +312,6 @@ func elementTypeAndWrapper(of childType: Any.Type) -> (Any.Type, String, TypeWra
     if childType == Bool.self {
         elementTypeName = "Flag"
     }
-
     else if let optional = childType as? OptionalType.Type {
         elementType = optional.wrappedType
         elementTypeName = "\(elementType)"
@@ -335,6 +334,10 @@ func elementTypeNameAndWrapper(of typeName: String) -> (String, TypeWrapper)
         elementTypeName = String(typeName.dropFirst(9).dropLast(1))
         typeWrapper = .optional
     }
+    else if typeName.hasSuffix("?") {
+        elementTypeName = String(typeName.dropLast(1))
+        typeWrapper = .optional
+    }
     else if typeName.hasPrefix("Array<") && typeName.hasSuffix(">"){
         elementTypeName = String(typeName.dropFirst(6).dropLast(1))
         typeWrapper = .array
@@ -346,6 +349,10 @@ func elementTypeNameAndWrapper(of typeName: String) -> (String, TypeWrapper)
     else if typeName.hasPrefix("Variadic<") && typeName.hasSuffix(">"){
         elementTypeName = String(typeName.dropFirst(9).dropLast(1))
         typeWrapper = .variadic
+    }
+    else if typeName.hasPrefix("Maybe<") && typeName.hasSuffix(">"){
+        elementTypeName = String(typeName.dropFirst(6).dropLast(1))
+        typeWrapper = .optional
     }
     else {
         elementTypeName = typeName

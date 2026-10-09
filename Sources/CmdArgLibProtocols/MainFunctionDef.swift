@@ -178,14 +178,14 @@ extension MainFunctionDef {
             for child in Mirror(reflecting: instance).children {
                 if let parameterName = child.label {
                     storedPropertyNames.insert(parameterName)
-                    var hasDefaultValue = true
+                    var defaultValueIsNil = false
                     var childType = type(of: child.value)
+                    let deadwood =  "\(childType)"
                     if let metaType = child.value as? MetaType{
                         metaTypePairs.append((parameterName, metaType))
                     }
                     if let optional = childType as? OptionalType.Type {
-                        childType = optional.wrappedType
-                        hasDefaultValue = false
+                        defaultValueIsNil = "\(child.value)" == "nil"
                     }
                     let actualTypeName = "\(childType)"
                     if actualTypeName.hasPrefix("MainFunctionAttributes") {
@@ -202,15 +202,17 @@ extension MainFunctionDef {
                     var labelSpec = parameterName
                     var elementTypeName = actualElementTypeName
                     var typeWrapper = actualTypewrapper
+                    var typeIsMaybe = false
                     if let (maybeLabelSpec, maybeTypeName) = parameterCustomSpecs[parameterName] {
                         let customLabelSpec = maybeLabelSpec ?? labelSpec
                         var customTypeName = maybeTypeName ?? actualTypeName
-                        if customTypeName.hasSuffix("??") {
-                            customTypeName = "Optional<\(customTypeName.dropLast(2))>"
-                        }
-                        else if customTypeName.hasSuffix("?") {
-                            customTypeName = "\(customTypeName.dropLast(1))"
-                        }
+                        typeIsMaybe = customTypeName.hasPrefix("Maybe<") && customTypeName.hasSuffix(">")
+//                        if customTypeName.hasSuffix("??") {
+//                            customTypeName = "Optional<\(customTypeName.dropLast(2))>"
+//                        }
+//                        else if customTypeName.hasSuffix("?") {
+//                            customTypeName = "\(customTypeName.dropLast(1))"
+//                        }
                         let (customElementTypeName, customTypeWrapper) = elementTypeNameAndWrapper(of: customTypeName)
                         var intendedTypeWrapper = customTypeWrapper
                         if customTypeWrapper == .variadic {
@@ -237,12 +239,13 @@ extension MainFunctionDef {
                     case .none:
                         typeName = elementTypeName
                     }
-                    if let value = child.value as? CustomStringConvertible, hasDefaultValue {
+                    if let value = child.value as? CustomStringConvertible, !defaultValueIsNil {
                         let parameter = Parameter(labelSpec, parameterName, typeName, __quotedOrNil(value))
                         parameters.append(parameter)
                     }
                     else {
-                        let parameter = Parameter(labelSpec, parameterName, typeName, nil)
+                        let notRequired = typeWrapper == .optional && typeIsMaybe
+                        let parameter = Parameter(labelSpec, parameterName, typeName, nil, forceNotRequired: notRequired)
                         parameters.append(parameter)
                     }
                 }
