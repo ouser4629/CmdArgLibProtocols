@@ -15,6 +15,8 @@
 import CmdArgLibCore
 import Foundation
 
+public typealias Maybe = Optional
+
 public struct MainFunctionAttributes: Sendable, Codable {
 
     public init(from decoder: any Decoder) throws
