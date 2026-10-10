@@ -210,11 +210,9 @@ extension CommandNodeDef {
                     var labelSpec = parameterName
                     var elementTypeName = actualElementTypeName
                     var typeWrapper = actualTypewrapper
-                    var typeIsMaybe = false
                     if let (maybeLabelSpec, maybeTypeName) = parameterCustomSpecs[parameterName] {
                         let customLabelSpec = maybeLabelSpec ?? labelSpec
                         let customTypeName = maybeTypeName ?? actualTypeName
-                        typeIsMaybe = customTypeName.hasPrefix("Maybe<") && customTypeName.hasSuffix(">")
                         let (customElementTypeName, customTypeWrapper) = elementTypeNameAndWrapper(of: customTypeName)
                         var intendedTypeWrapper = customTypeWrapper
                         if customTypeWrapper == .variadic {
@@ -246,7 +244,7 @@ extension CommandNodeDef {
                         parameters.append(parameter)
                     }
                     else {
-                        let parameter = Parameter(labelSpec, parameterName, typeName, nil, forceNotRequired: typeIsMaybe)
+                        let parameter = Parameter(labelSpec, parameterName, typeName, nil)
                         parameters.append(parameter)
                     }
                 }
@@ -354,11 +352,6 @@ func elementTypeNameAndWrapper(of rawTypeName: String) -> (String, TypeWrapper)
     else if typeName.hasPrefix("Variadic<") && typeName.hasSuffix(">"){
         elementTypeName = String(typeName.dropFirst(9).dropLast(1))
         typeWrapper = .variadic
-    }
-    else if typeName.hasPrefix("Maybe<") && typeName.hasSuffix(">"){
-        let rawTypeName = String(typeName.dropFirst(6).dropLast(1))
-        return elementTypeNameAndWrapper(of: rawTypeName)
-
     }
     else {
         elementTypeName = typeName
