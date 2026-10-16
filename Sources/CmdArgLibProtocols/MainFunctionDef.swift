@@ -15,14 +15,14 @@
 import CmdArgLibCore
 import Foundation
 
-/// Conforming structs have a static property, commandNode, that is an instance of CommandNode
-public protocol XMainFunctionDef: Sendable, Codable {
+public protocol ZCommandDef: Sendable {
     init()
-    func run() async throws
     static var argumentAttributes: ArgumentAttributes {get}
+
+    static func run(with words: [String]) async throws
 }
 
-extension XMainFunctionDef {
+extension ZCommandDef {
 
     public static var argumentAttributes: ArgumentAttributes { ArgumentAttributes() }
 
@@ -36,22 +36,102 @@ extension XMainFunctionDef {
         }
     }
 
-    public static func run(with words: [String] = []) async throws {
+    public static func run(parsing wordsString: String = "") async throws {
+        let words = shellSplit(wordsString)
+        try await run(with: words)
+    }
+}
+
+extension ZCommandDef {
+
+    @Sendable func runContextMaker() -> RunContext
+    {
+        let instance = Self.init()
+        let typeName = String(describing: type(of:self))
+        let commandName = SymbolFormatter.snake(typeName, "-")
+
+        var runContext = RunContext(commandName)
+        var metaTypePairs: [(ParameterName, MetaType)] = []
+        var parameters: [Parameter] = []
+        var storedPropertyNames: Set<String> = []
+        var messages: [String] = []
+        for child in Mirror(reflecting: instance).children {
+            if let parameterName = child.label {
+                storedPropertyNames.insert(parameterName)
+                var defaultValueIsNil = false
+                var childType = type(of: child.value)
+                if let metaType = child.value as? MetaType{
+                    metaTypePairs.append((parameterName, metaType))
+                }
+                if let optional = childType as? OptionalType.Type {
+                    childType = optional.wrappedType
+                    defaultValueIsNil = "\(child.value)" == "nil"
+                }
+                let actualTypeName = "\(childType)"
+                if actualTypeName.hasPrefix("CommandNodeAttributes<") {
+                    continue
+                }
+                let (actualElementType, _, _) = elementTypeAndWrapper(of: childType)
+                if !(childType is Bool.Type || childType is Rest.Type) {
+                    guard actualElementType is CmdArgBasicType.Type else {
+                        messages.append("\(childType) is not a valid stored property type to use with MainFunctionDef")
+                        continue
+                    }
+                }
+                var typeName = Self.argumentAttributes.typeNameFor[parameterName] ?? actualTypeName
+                if typeName == "Bool" {
+                    typeName = "Flag"
+                }
+                if typeName.first == "[" && typeName.last == "]" {
+                    typeName = "Array<\(typeName.dropFirst().dropLast())>"
+                }
+                if typeName.last == "?" {
+                    var name = typeName.dropLast()
+                    if name.last == "?" {
+                        name = name.dropLast()
+                        defaultValueIsNil = false
+                    }
+                    typeName = String(name)
+                }
+                if let value = child.value as? CustomStringConvertible {
+                    let parameter = Parameter(parameterName, parameterName, typeName, __quotedOrNil(value), forceNotRequired: !defaultValueIsNil)
+                    parameters.append(parameter)
+                }
+                else {
+                    let parameter = Parameter(parameterName, parameterName, typeName, nil, forceNotRequired: !defaultValueIsNil)
+                    parameters.append(parameter)
+                }
+            }
+        }
+        let showdowGroups = Self.argumentAttributes.shadowGroups
+        ensureShadowGroups(parameters, shadwoGroups: showdowGroups, messages: &messages)
+        ensureNoDuplicateLabelsAmong(parameters, messages: &messages)
+        if !messages.isEmpty {
+            fatalUseOfAPI(messages, file: #file, line: #line)
+        }
+        runContext.__addShadowGroups(showdowGroups)
+        runContext.__setMetaTypes(metaTypePairs)
+        runContext.setParameters(parameters)
+        return runContext
+    }
+}
+
+/// Conforming structs have a static property, commandNode, that is an instance of CommandNode
+public protocol MainFunctionDef: ZCommandDef, Codable {
+    func run() async throws
+}
+
+public extension MainFunctionDef {
+
+
+
+    static func run(with words: [String] = []) async throws {
         let commandNode = Self().commandNode
         try await commandNode.run(with: words)
     }
 
-    public static func run(parsing wordsString: String = "") async throws {
-        let commandNode = Self().commandNode
-        try await commandNode.run(parsing: wordsString)
-    }
-}
-
-extension XMainFunctionDef {
-
     var commandNode: CommandNode<Void> {
 
-        let instance = Self.init()
         let typeName = String(describing: type(of:self))
         let commandName = SymbolFormatter.snake(typeName, "-")
 
@@ -134,7 +214,7 @@ extension XMainFunctionDef {
                         encodedElement = "{\"elements\":[\(values.map{ "\"\($0)\""}.joined(separator: ", "))]}"
                     }
                     switch typeWrapper {
-                    case .array, .variadic:
+                    case .array:
                         encodedElement = "[\(encodedElement)]"
                     case .optional, .none:
                         break
@@ -172,73 +252,6 @@ extension XMainFunctionDef {
             return ([], trailingWords)
         }
 
-        @Sendable func runContextMaker() -> RunContext
-        {
-            var runContext = RunContext(commandName)
-            var metaTypePairs: [(ParameterName, MetaType)] = []
-            var parameters: [Parameter] = []
-            var storedPropertyNames: Set<String> = []
-            var messages: [String] = []
-            for child in Mirror(reflecting: instance).children {
-                if let parameterName = child.label {
-                    storedPropertyNames.insert(parameterName)
-                    var defaultValueIsNil = false
-                    var childType = type(of: child.value)
-                    if let metaType = child.value as? MetaType{
-                        metaTypePairs.append((parameterName, metaType))
-                    }
-                    if let optional = childType as? OptionalType.Type {
-                        childType = optional.wrappedType
-                        defaultValueIsNil = "\(child.value)" == "nil"
-                    }
-                    let actualTypeName = "\(childType)"
-                    if actualTypeName.hasPrefix("CommandNodeAttributes<") {
-                        continue
-                    }
-                    let (actualElementType, _, _) = elementTypeAndWrapper(of: childType)
-                    if !(childType is Bool.Type || childType is Rest.Type) {
-                        guard actualElementType is CmdArgBasicType.Type else {
-                            messages.append("\(childType) is not a valid stored property type to use with XMainFunctionDef")
-                            continue
-                        }
-                    }
-                    var typeName = Self.argumentAttributes.typeNameFor[parameterName] ?? actualTypeName
-                    if typeName == "Bool" {
-                        typeName = "Flag"
-                    }
-                    if typeName.first == "[" && typeName.last == "]" {
-                        typeName = "Array<\(typeName.dropFirst().dropLast())>"
-                    }
-                    if typeName.last == "?" {
-                        var name = typeName.dropLast()
-                        if name.last == "?" {
-                            name = name.dropLast()
-                            defaultValueIsNil = false
-                        }
-                        typeName = String(name)
-                    }
-                    if let value = child.value as? CustomStringConvertible {
-                        let parameter = Parameter(parameterName, parameterName, typeName, __quotedOrNil(value), forceNotRequired: !defaultValueIsNil)
-                        parameters.append(parameter)
-                    }
-                    else {
-                        let parameter = Parameter(parameterName, parameterName, typeName, nil, forceNotRequired: !defaultValueIsNil)
-                        parameters.append(parameter)
-                    }
-                }
-            }
-            let showdowGroups = Self.argumentAttributes.shadowGroups
-            ensureShadowGroups(parameters, shadwoGroups: showdowGroups, messages: &messages)
-            ensureNoDuplicateLabelsAmong(parameters, messages: &messages)
-            if !messages.isEmpty {
-                fatalUseOfAPI(messages, file: #file, line: #line)
-            }
-            runContext.__addShadowGroups(showdowGroups)
-            runContext.__setMetaTypes(metaTypePairs)
-            runContext.setParameters(parameters)
-            return runContext
-        }
-
         let commandNode = CommandNode(
             name: commandName,
             synopsis: "",
@@ -248,4 +261,5 @@ extension XMainFunctionDef {
         )
         return commandNode
     }
+
 }

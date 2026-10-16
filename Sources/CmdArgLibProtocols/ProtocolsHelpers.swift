@@ -84,6 +84,8 @@ func ensureNoDuplicateLabelsAmong(_ parameters: [Parameter], messages: inout [St
     }
 }
 
+enum TypeWrapper { case none, optional, array }
+
 func elementTypeAndWrapper(of childType: Any.Type) -> (Any.Type, String, TypeWrapper)
 {
     var elementType = childType
