@@ -21,8 +21,6 @@ public protocol MainFunctionDef: CommandDef, Codable {
 
 public extension MainFunctionDef {
 
-
-
     static func run(with words: [String] = []) async throws {
         let commandNode = Self().commandNode
         try await commandNode.run(with: words)
@@ -32,6 +30,13 @@ public extension MainFunctionDef {
 
         let typeName = String(describing: type(of:self))
         let commandName = SymbolFormatter.snake(typeName, "-")
+
+
+
+
+
+
+
 
 
 
@@ -159,5 +164,4 @@ public extension MainFunctionDef {
         )
         return commandNode
     }
-
 }

@@ -22,7 +22,6 @@ public protocol CommandNodeDef: CommandDef, Sendable, Codable {
     func run(state: [StateElement]) async throws -> [StateElement]
 }
 
-
 extension CommandNodeDef {
     public static func run(with words: [String] = []) async throws {
         let commandNode = Self().commandNode
