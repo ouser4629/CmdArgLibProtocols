@@ -188,9 +188,6 @@ public extension CommandDef {
                 if typeName == "Bool" {
                     typeName = "Flag"
                 }
-                if typeName.first == "[" && typeName.last == "]" {
-                    typeName = "Array<\(typeName.dropFirst().dropLast())>"
-                }
                 if typeName.last == "?" {
                     var name = typeName.dropLast()
                     if name.last == "?" {
@@ -198,6 +195,9 @@ public extension CommandDef {
                         defaultValueIsNil = false
                     }
                     typeName = String(name)
+                }
+                if typeName.first == "[" && typeName.last == "]" {
+                    typeName = "Array<\(typeName.dropFirst().dropLast())>"
                 }
                 if let value = child.value as? CustomStringConvertible {
                     let parameter = Parameter(parameterName, parameterName, typeName, __quotedOrNil(value), forceNotRequired: !defaultValueIsNil)
