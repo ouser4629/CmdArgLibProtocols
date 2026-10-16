@@ -16,7 +16,7 @@ import CmdArgLibCore
 import Foundation
 
 /// Conforming structs have a static property, commandNode, that is an instance of CommandNode
-public protocol CommandNodeDef: Sendable, Codable {
+public protocol XCommandNodeDef: Sendable, Codable {
     associatedtype StateElement:Sendable
     init()
     var commandNodeAttributes: CommandNodeAttributes<StateElement>? { get set }
@@ -28,7 +28,7 @@ enum TypeWrapper: String {
     case array, variadic, optional, none
 }
 
-extension CommandNodeDef {
+extension XCommandNodeDef {
 
     public static func run(with words: [String] = []) async throws {
         let commandNode = Self().commandNode
@@ -45,7 +45,7 @@ extension CommandNodeDef {
     }
 }
 
-extension CommandNodeDef {
+extension XCommandNodeDef {
 
     public var commandNode: CommandNode<StateElement> {
 

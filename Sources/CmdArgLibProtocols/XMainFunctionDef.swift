@@ -16,13 +16,13 @@ import CmdArgLibCore
 import Foundation
 
 /// Conforming structs have a static property, commandNode, that is an instance of CommandNode
-public protocol MainFunctionDef: Sendable, Codable {
+public protocol XMainFunctionDef: Sendable, Codable {
     init()
     func run() async throws
     static var argumentAttributes: ArgumentAttributes {get}
 }
 
-extension MainFunctionDef {
+extension XMainFunctionDef {
 
     public static var argumentAttributes: ArgumentAttributes { ArgumentAttributes() }
 
@@ -47,7 +47,7 @@ extension MainFunctionDef {
     }
 }
 
-extension MainFunctionDef {
+extension XMainFunctionDef {
 
     var commandNode: CommandNode<Void> {
 
@@ -198,7 +198,7 @@ extension MainFunctionDef {
                     let (actualElementType, _, _) = elementTypeAndWrapper(of: childType)
                     if !(childType is Bool.Type || childType is Rest.Type) {
                         guard actualElementType is CmdArgBasicType.Type else {
-                            messages.append("\(childType) is not a valid stored property type to use with MainFunctionDef")
+                            messages.append("\(childType) is not a valid stored property type to use with XMainFunctionDef")
                             continue
                         }
                     }
