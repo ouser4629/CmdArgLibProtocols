@@ -15,17 +15,17 @@
 import CmdArgLibCore
 import Foundation
 
-public protocol ZCommandDef: Sendable, Codable {
+public protocol CommandDef: Sendable, Codable {
     init()
     static var argumentAttributes: ArgumentAttributes {get}
     static func run(with words: [String]) async throws
 }
 
-public extension ZCommandDef {
+public extension CommandDef {
 
-    public static var argumentAttributes: ArgumentAttributes { ArgumentAttributes() }
+    static var argumentAttributes: ArgumentAttributes { ArgumentAttributes() }
 
-    public static func main() async {
+    static func main() async {
         let words = Array(CommandLine.arguments.dropFirst())
         do {
             try await run(with: words)
@@ -35,13 +35,13 @@ public extension ZCommandDef {
         }
     }
 
-    public static func run(parsing wordsString: String = "") async throws {
+    static func run(parsing wordsString: String = "") async throws {
         let words = shellSplit(wordsString)
         try await run(with: words)
     }
 }
 
-public extension ZCommandDef {
+public extension CommandDef {
 
     func encodeNode<StateElement>(
         words: [String],
@@ -148,7 +148,7 @@ public extension ZCommandDef {
     }
 }
 
-public extension ZCommandDef {
+public extension CommandDef {
 
     @Sendable func runContextMaker() -> RunContext
     {
