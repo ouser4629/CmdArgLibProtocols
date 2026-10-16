@@ -215,7 +215,7 @@ extension MainFunctionDef {
                             name = name.dropLast()
                             defaultValueIsNil = false
                         }
-                        typeName = "name"
+                        typeName = String(name)
                     }
                     if let value = child.value as? CustomStringConvertible {
                         let parameter = Parameter(parameterName, parameterName, typeName, __quotedOrNil(value), forceNotRequired: !defaultValueIsNil)
