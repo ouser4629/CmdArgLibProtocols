@@ -16,25 +16,19 @@ import CmdArgLibCore
 import Foundation
 
 /// Conforming structs have a static property, commandNode, that is an instance of CommandNode
-public protocol MainFunctionDef: Sendable, Codable {
+public protocol CommandNodeDef: Sendable, Codable {
+    associatedtype StateElement:Sendable
     init()
-    func run() async throws
+    var commandNodeAttributes: CommandNodeAttributes<StateElement>? { get set }
     static var argumentAttributes: ArgumentAttributes {get}
+    func run(state: [StateElement]) async throws -> [StateElement]
 }
 
-extension MainFunctionDef {
+enum TypeWrapper: String {
+    case array, variadic, optional, none
+}
 
-    public static var argumentAttributes: ArgumentAttributes { ArgumentAttributes() }
-
-    public static func main() async {
-        let words = Array(CommandLine.arguments.dropFirst())
-        do {
-            try await run(with: words)
-        }
-        catch {
-            Exception.printAndExit(for: error)
-        }
-    }
+extension CommandNodeDef {
 
     public static func run(with words: [String] = []) async throws {
         let commandNode = Self().commandNode
@@ -45,26 +39,41 @@ extension MainFunctionDef {
         let commandNode = Self().commandNode
         try await commandNode.run(parsing: wordsString)
     }
+
+    public static func main() async {
+        await runAsMain(Self().commandNode)
+    }
 }
 
-extension MainFunctionDef {
+extension CommandNodeDef {
 
-    var commandNode: CommandNode<Void> {
+    public var commandNode: CommandNode<StateElement> {
 
         let instance = Self.init()
         let typeName = String(describing: type(of:self))
-        let commandName = SymbolFormatter.snake(typeName, "-")
+        let defaultCommandName = SymbolFormatter.snake(typeName, "-")
+        let tentativeAttributes = instance.commandNodeAttributes ?? CommandNodeAttributes(commandName: defaultCommandName)
+        let commandNodeAttributes = if tentativeAttributes.commandName == "" {
+            CommandNodeAttributes(
+                commandName: defaultCommandName,
+                commandSynopsis: tentativeAttributes.commandSynopsis,
+                children: tentativeAttributes.children
+            )
+        }
+        else {
+            tentativeAttributes
+        }
 
         @Sendable func action(
-            words: [String], state: [Void] = [],
-            nodePath: [CommandNode<Void>],
-            runContext: RunContext) async throws -> ([Void], [String])
+            words: [String], state: [StateElement] = [],
+            nodePath: [CommandNode<StateElement>],
+            runContext: RunContext) async throws -> ([StateElement], [String])
         {
             let callNames = nodePath.map { $0.name }
             let parseResult = try ParseResult(
                 callNames: nodePath.map { $0.name },
                 words: words,
-                parentCommandMode: false,
+                parentCommandMode: !nodePath.last!.__children__.isEmpty,
                 context: runContext)
             let trailingWords = parseResult.trailingWords
             var messages = parseResult.parsedErrors.map { $0.description }
@@ -79,7 +88,7 @@ extension MainFunctionDef {
                 }
 
                 let (elementType, actualElementTypeName, typeWrapper) = elementTypeAndWrapper(of: childType)
-                if actualElementTypeName.hasPrefix("ArgumentAttributes") {
+                if actualElementTypeName.hasPrefix("CommandNodeAttributes<") {
                     continue
                 }
                 if let parsedValue = parseResult.parsedValues[name], parsedValue.wasEncountered, parsedValue.wasValid {
@@ -157,14 +166,15 @@ extension MainFunctionDef {
             let encoded = "{\(codedStrings.joined(separator: ", "))}"
             let decoder = JSONDecoder()
             let data = encoded.data(using: .utf8)!
-            let newInstance = try decoder.decode(Self.self, from: data)
-            try await newInstance.run()
-            return ([], trailingWords)
+            var newInstance = try decoder.decode(Self.self, from: data)
+            newInstance.commandNodeAttributes = self.commandNodeAttributes
+            let newState: [Self.StateElement] = try await newInstance.run(state: state)
+            return (newState, trailingWords)
         }
 
         @Sendable func runContextMaker() -> RunContext
         {
-            var runContext = RunContext(commandName)
+            var runContext = RunContext(commandNodeAttributes.commandName)
             var metaTypePairs: [(ParameterName, MetaType)] = []
             var parameters: [Parameter] = []
             var storedPropertyNames: Set<String> = []
@@ -182,6 +192,9 @@ extension MainFunctionDef {
                         defaultValueIsNil = "\(child.value)" == "nil"
                     }
                     let actualTypeName = "\(childType)"
+                    if actualTypeName.hasPrefix("CommandNodeAttributes<") {
+                        continue
+                    }
                     let (actualElementType, _, _) = elementTypeAndWrapper(of: childType)
                     if !(childType is Bool.Type || childType is Rest.Type) {
                         guard actualElementType is CmdArgBasicType.Type else {
@@ -193,13 +206,23 @@ extension MainFunctionDef {
                     if typeName == "Bool" {
                         typeName = "Flag"
                     }
-
-                    if let value = child.value as? CustomStringConvertible, !defaultValueIsNil {
-                        let parameter = Parameter(parameterName, parameterName, typeName, __quotedOrNil(value))
+                    if typeName.first == "[" && typeName.last == "]" {
+                        typeName = "Array<\(typeName.dropFirst().dropLast())>"
+                    }
+                    if typeName.last == "?" {
+                        var name = typeName.dropLast()
+                        if name.last == "?" {
+                            name = name.dropLast()
+                            defaultValueIsNil = false
+                        }
+                        typeName = "name"
+                    }
+                    if let value = child.value as? CustomStringConvertible {
+                        let parameter = Parameter(parameterName, parameterName, typeName, __quotedOrNil(value), forceNotRequired: !defaultValueIsNil)
                         parameters.append(parameter)
                     }
                     else {
-                        let parameter = Parameter(parameterName, parameterName, typeName, nil)
+                        let parameter = Parameter(parameterName, parameterName, typeName, nil, forceNotRequired: !defaultValueIsNil)
                         parameters.append(parameter)
                     }
                 }
@@ -217,13 +240,12 @@ extension MainFunctionDef {
         }
 
         let commandNode = CommandNode(
-            name: commandName,
-            synopsis: "",
+            name: commandNodeAttributes.commandName,
+            synopsis: commandNodeAttributes.commandSynopsis,
             action: action,
             runContextMaker: runContextMaker,
-            children: []
+            children: commandNodeAttributes.children
         )
         return commandNode
     }
 }
-
