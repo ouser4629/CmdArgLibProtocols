@@ -21,7 +21,7 @@ public protocol ZCommandDef: Sendable, Codable {
     static func run(with words: [String]) async throws
 }
 
-extension ZCommandDef {
+public extension ZCommandDef {
 
     public static var argumentAttributes: ArgumentAttributes { ArgumentAttributes() }
 
@@ -41,13 +41,13 @@ extension ZCommandDef {
     }
 }
 
-extension ZCommandDef {
+public extension ZCommandDef {
 
-        func encodeNode<StateElement>(
-            words: [String],
-            state: [StateElement] = [],
-            nodePath: [CommandNode<StateElement>],
-            runContext: RunContext) async throws -> String
+    func encodeNode<StateElement>(
+        words: [String],
+        state: [StateElement] = [],
+        nodePath: [CommandNode<StateElement>],
+        runContext: RunContext) async throws -> (endoded: String, trailingWords: [String])
     {
         let callNames = nodePath.map { $0.name }
         let parseResult = try ParseResult(
@@ -144,11 +144,11 @@ extension ZCommandDef {
             throw Exception.stderr(errorScreen.description)
         }
         let encoded = "{\(codedStrings.joined(separator: ", "))}"
-        return encoded
+        return (encoded, trailingWords)
     }
 }
 
-extension ZCommandDef {
+public extension ZCommandDef {
 
     @Sendable func runContextMaker() -> RunContext
     {
