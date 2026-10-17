@@ -92,10 +92,7 @@ func elementTypeAndWrapper(of childType: Any.Type) -> (Any.Type, String, TypeWra
     var elementTypeName = "\(childType)"
     var typeWrapper: TypeWrapper = .none
 
-    if childType == Bool.self {
-        elementTypeName = "Flag"
-    }
-    else if let optional = childType as? OptionalType.Type {
+   if let optional = childType as? OptionalType.Type {
         elementType = optional.wrappedType
         elementTypeName = "\(elementType)"
         typeWrapper = .optional

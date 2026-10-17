@@ -164,14 +164,14 @@ public extension CommandDef {
         for child in Mirror(reflecting: instance).children {
             if let parameterName = child.label {
                 storedPropertyNames.insert(parameterName)
-                var defaultValueIsNil = false
+                var hasDefaultValue = true
                 var childType = type(of: child.value)
                 if let metaType = child.value as? MetaType{
                     metaTypePairs.append((parameterName, metaType))
                 }
                 if let optional = childType as? OptionalType.Type {
                     childType = optional.wrappedType
-                    defaultValueIsNil = "\(child.value)" == "nil"
+                    hasDefaultValue = "\(child.value)" != "nil"
                 }
                 let actualTypeName = "\(childType)"
                 if actualTypeName.hasPrefix("CommandNodeAttributes<") {
@@ -191,8 +191,7 @@ public extension CommandDef {
                 if typeName.last == "?" {
                     var name = typeName.dropLast()
                     if name.last == "?" {
-                        name = name.dropLast()
-                        defaultValueIsNil = false
+                        name = "Optional<\(name.dropLast())>"
                     }
                     typeName = String(name)
                 }
@@ -200,11 +199,11 @@ public extension CommandDef {
                     typeName = "Array<\(typeName.dropFirst().dropLast())>"
                 }
                 if let value = child.value as? CustomStringConvertible {
-                    let parameter = Parameter(parameterName, parameterName, typeName, __quotedOrNil(value), forceNotRequired: !defaultValueIsNil)
+                    let parameter = Parameter(parameterName, parameterName, typeName, __quotedOrNil(value), forceNotRequired: hasDefaultValue)
                     parameters.append(parameter)
                 }
                 else {
-                    let parameter = Parameter(parameterName, parameterName, typeName, nil, forceNotRequired: !defaultValueIsNil)
+                    let parameter = Parameter(parameterName, parameterName, typeName, nil, forceNotRequired: hasDefaultValue)
                     parameters.append(parameter)
                 }
             }
